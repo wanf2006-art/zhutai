@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#06111d">
+  <meta name="description" content="筑台者 V2：纯离线的个人成长、复盘、计划、洞察与产品迭代系统。">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="筑台者">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" href="./icon-sprout-180.png">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <title>筑台者 V2</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="app-shell" id="appShell">
+    <aside class="sidebar" id="sidebar" aria-label="主导航">
+      <div class="brand-block">
+        <span class="brand-logo" id="brandLogo" aria-hidden="true"></span>
+        <div><strong>筑台者</strong><small>BUILDER · V2</small></div>
+      </div>
+      <nav class="side-nav" id="sideNav"></nav>
+      <div class="sidebar-idea">
+        <span class="idea-line"></span>
+        <p>筑台不争一日高，<br>争的是层层不息。</p>
+        <small>— 筑台者</small>
+      </div>
+    </aside>
+
+    <header class="mobile-head">
+      <button class="icon-btn" type="button" data-action="toggle-menu" aria-label="打开导航" id="menuToggle"></button>
+      <div class="mobile-brand"><span class="mini-logo" aria-hidden="true"></span><strong>筑台者</strong></div>
+      <span class="offline-pill">离线</span>
+    </header>
+
+    <main class="main-content">
+      <section class="view active" id="view-overview" data-view="overview" aria-labelledby="overviewHeading">
+        <div class="welcome-row">
+          <div class="welcome-copy">
+            <span class="eyebrow">TODAY · BUILD THE NEXT LAYER</span>
+            <h1 id="overviewHeading"><span id="greetingText">你好</span><span id="userNameText">，筑台者</span><span class="wave">👋</span></h1>
+            <p id="greetingSub">每一步的积累，都是在为未来筑台。</p>
+          </div>
+          <article class="clock-card card-surface" aria-label="当前时间">
+            <div class="clock-date"><span id="clockDate"></span><span id="clockWeek"></span></div>
+            <div class="clock-time"><strong id="clockTime">--:--</strong><span id="clockPeriodIcon">☾</span></div>
+            <p>坚持记录的第 <strong id="streakDays">0</strong> 天</p>
+          </article>
+        </div>
+
+        <article class="correction-card card-surface" id="correctionCard">
+          <div class="correction-mark" id="correctionIcon"></div>
+          <div class="correction-main">
+            <span class="eyebrow gold">CURRENT CORRECTION · 当前整改</span>
+            <h2 id="correctionGoalText">尚未设置当前整改目标</h2>
+            <p id="correctionActionText">先确定本阶段只改哪一件事。</p>
+          </div>
+          <div class="correction-meta">
+            <span id="correctionSince">未开始</span>
+            <span class="status-pill" id="correctionStatus">待设置</span>
+          </div>
+          <div class="correction-actions">
+            <button class="btn subtle" type="button" data-action="edit-correction">编辑整改</button>
+            <button class="btn gold-outline" type="button" data-action="complete-correction">完成本轮</button>
+          </div>
+        </article>
+
+        <div class="metric-grid">
+          <article class="metric-card card-surface tone-blue"><div class="metric-head"><span class="metric-icon" data-icon-slot="focus"></span><span>今日专注时长</span></div><strong><span id="metricFocus">0</span><small>分钟</small></strong><p id="metricFocusSub">来自今日完成记录</p><div class="mini-wave" id="focusWave"></div></article>
+          <article class="metric-card card-surface tone-gold"><div class="metric-head"><span class="metric-icon" data-icon-slot="task"></span><span>今日完成任务</span></div><strong><span id="metricTasks">0 / 0</span></strong><p id="metricTasksSub">完成度 0%</p><div class="progress"><i id="taskProgress"></i></div></article>
+          <article class="metric-card card-surface tone-green"><div class="metric-head"><span class="metric-icon" data-icon-slot="calendar"></span><span>累计记录天数</span></div><strong><span id="metricRecordDays">0</span><small>天</small></strong><p>每一次真实记录都算数</p></article>
+          <article class="metric-card card-surface tone-violet"><div class="metric-head"><span class="metric-icon" data-icon-slot="life"></span><span>人生进度</span></div><div class="life-metric"><div><strong><span id="metricAge">--</span><small>岁</small></strong><p id="lifeStageText">在设置中填写出生日期</p></div><div class="ring" id="lifeRing"><span id="lifePercent">--</span></div></div></article>
+        </div>
+
+        <div class="dashboard-grid hero-grid">
+          <article class="card-surface trajectory-card span-2">
+            <header class="card-head"><div><span class="eyebrow">TODAY TRACE</span><h2>今日轨迹</h2></div><button class="btn subtle" type="button" data-nav="life-plan" data-icon-button="edit">编辑计划</button></header>
+            <div class="timeline" id="todayTimeline"></div>
+          </article>
+          <article class="card-surface calendar-card">
+            <header class="card-head"><div><span class="eyebrow">CALENDAR</span><h2>日历视图</h2></div></header>
+            <div class="calendar-switch"><button class="icon-btn small" type="button" data-action="calendar-prev" aria-label="上个月">‹</button><strong id="calendarLabel"></strong><button class="icon-btn small" type="button" data-action="calendar-next" aria-label="下个月">›</button></div>
+            <div class="week-row"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+            <div class="calendar-grid" id="calendarGrid"></div>
+            <div class="calendar-day" id="calendarDayPanel"></div>
+          </article>
+        </div>
+
+        <div class="dashboard-grid insight-grid">
+          <article class="card-surface goals-card"><header class="card-head"><div><span class="eyebrow">CORE GOALS</span><h2>核心目标</h2></div><button class="text-btn" type="button" data-action="add-goal">＋ 新增</button></header><div id="overviewGoals" class="compact-list"></div></article>
+          <article class="card-surface focus-card"><header class="card-head"><div><span class="eyebrow">RECENT FOCUS</span><h2>近期重点</h2></div><button class="text-btn" type="button" data-action="add-focus">＋ 新增</button></header><div id="overviewFocus" class="rank-list"></div></article>
+          <article class="quote-card card-surface"><span class="quote-mark">“</span><blockquote id="dailyQuote">不是看到了希望才坚持，而是坚持了才会看到希望。</blockquote><p>— 筑台者</p><div class="quote-actions"><button class="icon-btn small" type="button" data-action="prev-quote" aria-label="上一条语录">‹</button><button class="text-btn" type="button" data-action="edit-quotes">编辑语录</button><button class="icon-btn small" type="button" data-action="next-quote" aria-label="下一条语录">›</button></div></article>
+        </div>
+
+        <div class="dashboard-grid bottom-grid">
+          <article class="card-surface recent-card"><header class="card-head"><div><span class="eyebrow">RECENT RECORDS</span><h2>最近记录</h2></div><button class="text-btn" type="button" data-nav="daily">查看全部</button></header><div id="recentRecords" class="recent-list"></div></article>
+          <article class="card-surface chart-card"><header class="card-head"><div><span class="eyebrow">7 DAY TREND</span><h2>数据看板摘要</h2></div><span class="chart-total" id="chartTotal"></span></header><div class="chart-wrap" id="overviewChart"></div><div class="chart-legend" id="overviewLegend"></div></article>
+        </div>
+      </section>
+
+      <section class="view" id="view-daily" data-view="daily" aria-labelledby="dailyHeading">
+        <div class="page-head"><div><span class="eyebrow">DAILY ARCHIVE</span><h1 id="dailyHeading">每日记录</h1><p>把行动、证据和整改留在同一条时间线上。</p></div><button class="btn primary" type="button" data-action="focus-review-input">＋ 新建复盘</button></div>
+        <article class="review-composer card-surface">
+          <div class="composer-copy"><span class="eyebrow gold">智能结构识别 · 纯离线</span><h2>粘贴完整复盘</h2><p>按固定标题和近义标题识别，确认后才保存；不会自动覆盖当前整改目标。</p></div>
+          <label class="field-label" for="reviewRawInput">完整复盘原文</label>
+          <textarea class="large-input" id="reviewRawInput" placeholder="例如：&#10;今天做了什么：……&#10;今天最重要的一件事：……&#10;上次整改目标：……&#10;今日执行结果：……&#10;事实证据：……&#10;明日整改动作：……&#10;验收标准：……"></textarea>
+          <div class="composer-foot"><span class="helper" id="reviewParseStatus">支持 V1 标题与 V2 新字段。</span><button class="btn primary" type="button" data-action="identify-review">识别复盘</button></div>
+          <form class="structured-form hidden" id="reviewStructuredForm"></form>
+        </article>
+        <div class="section-toolbar card-surface"><label class="search-box" data-icon="search"><input id="reviewSearch" placeholder="搜索全部复盘字段"></label><div class="filter-row" id="reviewFilters"><button class="chip active" data-review-filter="全部">全部</button><button class="chip" data-review-filter="做到">做到</button><button class="chip" data-review-filter="部分做到">部分做到</button><button class="chip" data-review-filter="没做到">没做到</button></div></div>
+        <div class="archive-list" id="reviewList"></div>
+      </section>
+
+      <section class="view" id="view-life-plan" data-view="life-plan" aria-labelledby="planHeading">
+        <div class="page-head"><div><span class="eyebrow">LIFE PLAN</span><h1 id="planHeading">人生计划</h1><p>先守住唯一长期主线，再安排今天这一层。</p></div><button class="btn primary" type="button" data-action="add-task">＋ 新增今日任务</button></div>
+        <article class="mainline-card card-surface" id="mainlineCard"></article>
+        <div class="split-layout">
+          <article class="card-surface"><header class="card-head"><div><span class="eyebrow">TODAY PLAN</span><h2>今日计划</h2></div><button class="text-btn" type="button" data-action="add-task">＋ 新增</button></header><div id="taskList" class="task-list"></div></article>
+          <article class="card-surface"><header class="card-head"><div><span class="eyebrow">LONG-TERM GOALS</span><h2>长期计划</h2></div><button class="text-btn" type="button" data-action="add-goal">＋ 新增</button></header><div id="goalList" class="goal-list"></div></article>
+        </div>
+      </section>
+
+      <section class="view" id="view-insights" data-view="insights" aria-labelledby="insightHeading">
+        <div class="page-head"><div><span class="eyebrow">DEMAND INSIGHT</span><h1 id="insightHeading">需求洞察</h1><p>记录真实场景、用户任务和需要验证的未知点。</p></div><button class="btn primary" type="button" data-action="add-insight">＋ 新增洞察</button></div>
+        <div class="section-toolbar card-surface"><label class="search-box" data-icon="search"><input id="insightSearch" placeholder="搜索标题、场景、问题、结论"></label><select id="insightSort" aria-label="洞察排序"><option value="new">日期从新到旧</option><option value="old">日期从旧到新</option></select></div>
+        <div class="card-grid" id="insightList"></div>
+      </section>
+
+      <section class="view" id="view-products" data-view="products" aria-labelledby="productHeading">
+        <div class="page-head"><div><span class="eyebrow">PRODUCT ITERATION</span><h1 id="productHeading">产品迭代</h1><p>让每次修改都能追溯到真实卡点与验证结果。</p></div><div class="button-group"><button class="btn subtle" type="button" data-action="add-product">＋ 新建产品</button><button class="btn primary" type="button" data-action="add-iteration">＋ 记录迭代</button></div></div>
+        <div class="product-layout"><div class="product-list" id="productList"></div><article class="product-detail card-surface" id="productDetail"></article></div>
+      </section>
+
+      <section class="view" id="view-learning" data-view="learning" aria-labelledby="learningHeading">
+        <div class="page-head"><div><span class="eyebrow">LEARNING GROWTH</span><h1 id="learningHeading">学习成长</h1><p>知识必须回到练习、产品和真实卡点里。</p></div><button class="btn primary" type="button" data-action="add-learning">＋ 记录学习</button></div>
+        <div class="mini-stat-row" id="learningStats"></div><div class="archive-list" id="learningList"></div>
+      </section>
+
+      <section class="view" id="view-meditation" data-view="meditation" aria-labelledby="meditationHeading">
+        <div class="page-head"><div><span class="eyebrow">MEDITATION & REFLECTION</span><h1 id="meditationHeading">冥想与反思</h1><p>观察状态变化，让思考有停下来的空间。</p></div><button class="btn primary" type="button" data-action="add-meditation">＋ 记录冥想</button></div>
+        <div class="mini-stat-row" id="meditationStats"></div><div class="archive-list" id="meditationList"></div>
+      </section>
+
+      <section class="view" id="view-resources" data-view="resources" aria-labelledby="resourceHeading">
+        <div class="page-head"><div><span class="eyebrow">RESOURCE LIBRARY</span><h1 id="resourceHeading">资源库</h1><p>保存真正值得回看的知识，不主动联网抓取内容。</p></div><button class="btn primary" type="button" data-action="add-resource">＋ 保存资源</button></div>
+        <div class="section-toolbar card-surface"><label class="search-box" data-icon="search"><input id="resourceSearch" placeholder="搜索标题、来源、备注、关键词"></label><select id="resourceFilter" aria-label="资源类型筛选"><option value="全部">全部类型</option><option>书籍</option><option>文章</option><option>编程知识</option><option>产品案例</option><option>重要句子</option><option>以后再看</option></select></div>
+        <div class="card-grid" id="resourceList"></div>
+      </section>
+
+      <section class="view" id="view-dashboard" data-view="dashboard" aria-labelledby="dashboardHeading">
+        <div class="page-head"><div><span class="eyebrow">DATA DASHBOARD</span><h1 id="dashboardHeading">数据看板</h1><p>所有数字都来自本机真实记录。</p></div><select id="dashboardRange" aria-label="数据范围"><option value="7">最近7天</option><option value="30">最近30天</option></select></div>
+        <div class="dashboard-stat-grid" id="dashboardStats"></div>
+        <div class="dashboard-grid analytics-grid"><article class="card-surface span-2"><header class="card-head"><div><span class="eyebrow">TREND</span><h2>记录趋势</h2></div></header><div class="chart-wrap large" id="dashboardChart"></div></article><article class="card-surface"><header class="card-head"><div><span class="eyebrow">COMPOSITION</span><h2>记录构成</h2></div></header><div id="compositionChart"></div></article></div>
+      </section>
+
+      <section class="view" id="view-settings" data-view="settings" aria-labelledby="settingsHeading">
+        <div class="page-head"><div><span class="eyebrow">SETTINGS</span><h1 id="settingsHeading">设置</h1><p>管理个人信息、显示偏好和全部本地数据。</p></div></div>
+        <div class="settings-grid">
+          <form class="settings-form card-surface" id="profileForm"><header class="card-head"><div><span class="eyebrow">PROFILE</span><h2>个人设置</h2></div></header><div class="form-grid"><label>用户姓名<input name="name" placeholder="例如：丁振超"></label><label>出生日期<input name="birthDate" type="date"></label><label>目标年龄<input name="targetAge" type="number" min="1" max="150"></label><label class="full">每日问候语<input name="greeting" placeholder="每一步的积累，都是在为未来筑台。"></label><label>默认主题<select name="theme"><option value="dark">深蓝黑 · 默认</option><option value="midnight">午夜蓝</option></select></label></div><button class="btn primary" type="submit">保存设置</button></form>
+          <article class="data-card card-surface"><header class="card-head"><div><span class="eyebrow">LOCAL DATA</span><h2>数据备份</h2></div></header><p>数据只保存在当前浏览器。建议每周导出一次完整 JSON 备份。</p><div class="stack-buttons"><button class="btn subtle" type="button" data-action="export-all">导出全部数据</button><button class="btn subtle" type="button" data-action="import-all">从 JSON 恢复</button><button class="btn danger" type="button" data-action="clear-all">清空 V2 数据</button></div><small id="storageSummary"></small></article>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="overlay" id="overlay" data-action="close-mobile-menu"></div>
+  <div class="modal-layer" id="modalLayer" aria-hidden="true">
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <header class="modal-head"><div><span class="eyebrow" id="modalEyebrow">RECORD</span><h2 id="modalTitle">新建记录</h2></div><button class="icon-btn" type="button" data-action="close-modal" aria-label="关闭">×</button></header>
+      <form class="modal-body" id="modalForm"></form>
+    </section>
+  </div>
+  <div class="drawer-layer" id="drawerLayer" aria-hidden="true">
+    <article class="detail-drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle"><header class="drawer-head"><div><span class="eyebrow" id="drawerEyebrow">DETAIL</span><h2 id="drawerTitle">记录详情</h2></div><button class="icon-btn" type="button" data-action="close-drawer" aria-label="关闭">×</button></header><div class="drawer-body" id="drawerBody"></div></article>
+  </div>
+  <input type="file" id="importFile" accept=".json,application/json" hidden>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="./js/icons.js" defer></script>
+  <script src="./js/storage.js" defer></script>
+  <script src="./js/app.js" defer></script>
+</body>
+</html>

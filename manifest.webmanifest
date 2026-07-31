@@ -1,0 +1,15 @@
+{
+  "name": "筑台者 V2",
+  "short_name": "筑台者",
+  "description": "纯离线的个人成长、复盘、计划、洞察与产品迭代系统。",
+  "lang": "zh-CN",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#050c14",
+  "theme_color": "#06111d",
+  "icons": [
+    { "src": "./icon-sprout-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "./icon-sprout-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

@@ -3,6 +3,7 @@
 
   var Store = window.ZTStore;
   var Icons = window.ZTIcons;
+  var ImportParser = window.ZTImportParser;
   var state = Store.load();
   var currentPage = "overview";
   var selectedProductId = state.products[0] ? state.products[0].id : "";
@@ -18,9 +19,11 @@
   var dashboardRange = 7;
   var modalSubmitHandler = null;
   var clockTimer = null;
+  var smartImportDraft = null;
 
   var navItems = [
     { id: "overview", label: "今日概览", icon: "home" },
+    { id: "smart-import", label: "智能导入", icon: "build" },
     { id: "daily", label: "每日记录", icon: "daily" },
     { id: "life-plan", label: "人生计划", icon: "plan" },
     { id: "insights", label: "需求洞察", icon: "insight" },
@@ -46,7 +49,18 @@
   function shortDate(value) { var d = toDate(value); return (d.getMonth() + 1) + "月" + d.getDate() + "日"; }
   function getFormObject(form) { var result = {}; new FormData(form).forEach(function (value, key) { result[key] = String(value); }); return result; }
   function showToast(message) { var toast = $("toast"); toast.textContent = message; toast.classList.add("show"); clearTimeout(showToast.timer); showToast.timer = setTimeout(function () { toast.classList.remove("show"); }, 2100); }
-  function save(message) { state = Store.save(state); renderAll(); if (message) showToast(message); }
+  function save(message) {
+    try {
+      state = Store.save(state);
+      renderAll();
+      if (message) showToast(message);
+      return true;
+    } catch (error) {
+      try { state = Store.load(); renderAll(); } catch (loadError) {}
+      showToast("保存失败，原数据未被覆盖：" + error.message);
+      return false;
+    }
+  }
   function download(name, content, type) { var blob = new Blob([content], { type: type || "application/json;charset=utf-8" }); var link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = name; document.body.appendChild(link); link.click(); link.remove(); setTimeout(function () { URL.revokeObjectURL(link.href); }, 800); }
   function findById(list, id) { return list.find(function (item) { return item.id === id; }); }
   function removeById(list, id) { return list.filter(function (item) { return item.id !== id; }); }
@@ -218,6 +232,7 @@
     $("lifeRing").style.setProperty("--ring", life.percent == null ? "0%" : life.percent + "%");
     $("lifeStageText").textContent = life.percent == null ? "在设置中填写出生日期" : "按目标年龄平静记录进度";
     $("focusWave").innerHTML = miniWaveSvg();
+    renderOverviewPlanSummary();
     renderTimeline();
     renderCalendar();
     renderOverviewGoals();
@@ -226,6 +241,19 @@
     renderRecent();
     renderOverviewChart();
     updateClock();
+  }
+
+  function latestPlanForDate(date) {
+    return state.plans.filter(function (item) { return item.date === date; }).sort(function (a, b) { return String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")); })[0] || null;
+  }
+  function renderOverviewPlanSummary() {
+    var target = $("overviewPlanSummary");
+    if (!target) return;
+    var plan = latestPlanForDate(Store.today());
+    if (!plan) { target.innerHTML = ""; return; }
+    var related = state.tasks.filter(function (task) { return task.planId === plan.id; });
+    var completed = related.filter(function (task) { return task.completed; }).length;
+    target.innerHTML = '<div class="overview-plan-strip"><div><span class="eyebrow gold">TODAY PLAN · 今日最重要</span><strong>' + esc(plan.mostImportant || "今天的计划已导入") + '</strong><small>' + esc((plan.latestStart ? "最晚 " + plan.latestStart + " 开始" : "") + (plan.minAction ? (plan.latestStart ? " · " : "") + "最低动作：" + plan.minAction : "")) + '</small></div><button class="text-btn" type="button" data-nav="life-plan">' + completed + ' / ' + related.length + ' 已完成 →</button></div>';
   }
 
   function timelineColor(type) { if (type === "冥想") return "blue"; if (type === "学习") return "gold"; if (type === "产品迭代") return "red"; if (type === "计划") return "green"; return "blue"; }
@@ -268,8 +296,10 @@
   function renderCalendarDay() {
     var tasks = state.tasks.filter(function (item) { return item.date === selectedCalendarDate; }).sort(function (a, b) { return timeOf(a.time).localeCompare(timeOf(b.time)); });
     var other = allRecords().filter(function (item) { return item.date === selectedCalendarDate && item.key !== "tasks"; });
+    var plan = latestPlanForDate(selectedCalendarDate);
     var html = '<div class="calendar-day-head"><span>' + esc(selectedCalendarDate === Store.today() ? "今日计划" : formatDate(selectedCalendarDate)) + '</span><button class="text-btn" type="button" data-action="add-task-selected">＋ 新增</button></div>';
-    if (!tasks.length && !other.length) html += '<div class="calendar-mini-task"><span>这一天还没有记录</span></div>';
+    if (plan) html += '<div class="calendar-plan-focus"><strong>' + esc(plan.mostImportant || "已导入计划") + '</strong>' + (plan.latestStart ? '<span>最晚 ' + esc(plan.latestStart) + ' 开始</span>' : '') + '</div>';
+    if (!tasks.length && !other.length && !plan) html += '<div class="calendar-mini-task"><span>这一天还没有记录</span></div>';
     tasks.slice(0, 4).forEach(function (task) { html += '<label class="calendar-mini-task"><input type="checkbox" data-action="toggle-task" data-id="' + esc(task.id) + '"' + (task.completed ? " checked" : "") + '><span>' + esc(task.title) + '</span><time>' + esc(task.time || "") + '</time></label>'; });
     other.slice(0, 2).forEach(function (item) { html += '<div class="calendar-mini-task"><span>' + esc(item.type + " · " + item.title) + '</span></div>'; });
     $("calendarDayPanel").innerHTML = html;
@@ -390,10 +420,159 @@
       '</div><div class="form-actions"><button class="btn subtle" type="button" data-action="cancel-review-preview">取消</button><button class="btn primary" type="submit">' + (mode === "edit" ? "保存修改" : "确认保存") + '</button></div>';
   }
   function showReviewPreview(parsed) { $("reviewStructuredForm").innerHTML = reviewFormHtml(parsed, "new"); $("reviewStructuredForm").classList.remove("hidden"); $("reviewStructuredForm").dataset.mode = "new"; $("reviewStructuredForm").dataset.id = ""; }
+
+  function importStatusText(status) {
+    if (status === "high") return "已识别";
+    if (status === "low") return "低置信度，请确认";
+    return "未识别，请确认";
+  }
+  function referencePlanForReview(date) {
+    return latestPlanForDate(date) || latestPlanForDate(addDays(date, -1));
+  }
+  function addPlanReferenceToReview(parsed) {
+    if (!parsed || parsed.type !== "review" || !parsed.data) return parsed;
+    var plan = referencePlanForReview(parsed.data.date || Store.today());
+    if (!plan) return parsed;
+    var tasks = state.tasks.filter(function (task) { return task.planId === plan.id; });
+    if (!parsed.data.previousGoal && plan.mostImportant) {
+      parsed.data.previousGoal = plan.mostImportant;
+      parsed.meta.previousGoal = { status: "low", source: "参考已保存计划的最重要事项" };
+    }
+    if (!parsed.data.evidence && tasks.length) {
+      var done = tasks.filter(function (task) { return task.completed; });
+      var undone = tasks.filter(function (task) { return !task.completed; });
+      parsed.data.evidence = "计划完成 " + done.length + "/" + tasks.length + " 项。" + (undone.length ? "未完成：" + undone.map(function (task) { return task.title; }).join("、") + "。" : "计划任务已全部完成。");
+      parsed.meta.evidence = { status: "low", source: "根据已保存计划的勾选情况生成，请确认" };
+    }
+    return parsed;
+  }
+  function importFieldHtml(field, value, meta) {
+    var status = meta && meta.status || "missing";
+    var source = meta && meta.source || importStatusText(status);
+    var className = "import-field status-" + status + (field.raw ? " full raw-field" : "");
+    var input;
+    if (field.date) input = '<input name="' + esc(field.key) + '" type="date" value="' + esc(value || "") + '">';
+    else input = '<textarea name="' + esc(field.key) + '" rows="' + (field.raw ? "8" : "3") + '" placeholder="' + (status === "missing" ? "未识别，请确认或补充" : "") + '">' + esc(value || "") + '</textarea>';
+    return '<label class="' + className + '"><span class="import-field-head"><strong>' + esc(field.label) + '</strong><em class="confidence-label">' + esc(importStatusText(status)) + '</em></span>' + input + '<small>' + esc(source) + '</small></label>';
+  }
+  function renderSmartImportPreview(parsed) {
+    if (!parsed || !parsed.type) return;
+    parsed = addPlanReferenceToReview(parsed);
+    smartImportDraft = parsed;
+    var fields = ImportParser.getFields(parsed.type);
+    var recognized = fields.filter(function (field) { return !field.raw && parsed.data[field.key]; }).length;
+    var missing = fields.filter(function (field) { return !field.raw && !parsed.data[field.key]; }).length;
+    $("smartImportFields").innerHTML = fields.map(function (field) { return importFieldHtml(field, parsed.data[field.key], parsed.meta[field.key]); }).join("");
+    $("smartPreviewTitle").textContent = parsed.type === "plan" ? "次日计划预览" : "每日复盘预览";
+    $("smartPreviewType").textContent = parsed.type === "plan" ? "次日计划" : "每日复盘";
+    $("smartPreviewSummary").textContent = "已填入 " + recognized + " 项，" + missing + " 项需要确认。带提示的字段可以直接修改。";
+    $("smartImportPreviewForm").dataset.type = parsed.type;
+    $("smartImportPasteStep").classList.add("hidden");
+    $("smartImportPreviewForm").classList.remove("hidden");
+    setTimeout(function () { $("smartImportPreviewForm").scrollIntoView({ behavior: "smooth", block: "start" }); }, 20);
+  }
+  function identifySmartImport(forcedType) {
+    var raw = $("smartImportRaw").value.trim();
+    if (!raw) { showToast("请先粘贴复盘或计划原文"); return; }
+    var parsed = ImportParser.parse(raw, forcedType || "");
+    $("smartImportManualType").classList.add("hidden");
+    if (!parsed.type) {
+      smartImportDraft = { rawText: raw, scores: parsed.scores };
+      $("smartImportStatus").textContent = "已保留原文，但暂时无法可靠判断类型。请选择复盘或计划继续。";
+      $("smartImportManualType").classList.remove("hidden");
+      showToast("请手动选择记录类型");
+      return;
+    }
+    renderSmartImportPreview(parsed);
+  }
+  function resetSmartImport(clearRaw) {
+    smartImportDraft = null;
+    $("smartImportPreviewForm").classList.add("hidden");
+    $("smartImportPreviewForm").reset();
+    $("smartImportPreviewForm").dataset.type = "";
+    $("smartImportFields").innerHTML = "";
+    $("smartImportPasteStep").classList.remove("hidden");
+    $("smartImportManualType").classList.add("hidden");
+    if (clearRaw) $("smartImportRaw").value = "";
+    $("smartImportStatus").textContent = clearRaw ? "导入已取消，正式数据没有发生变化。" : "原文仍保留，可修改后重新识别。";
+  }
+  function cleanTaskTitle(value) {
+    return String(value || "").replace(/^\s*(?:[-+*]\s+|[①-⑳]\s*|[一二三四五六七八九十]+[.、)]\s*|\d+[.、)]\s*)/, "").replace(/^\s*\d{1,2}\s*[：:]\s*\d{2}\s*[·｜|：:]?\s*/, "").replace(/[。；;]\s*$/, "").trim();
+  }
+  function taskLines(value) {
+    function keepTime(line) { return String(line || "").replace(/^\s*(?:[-+*]\s+|[①-⑳]\s*|[一二三四五六七八九十]+[.、)]\s*|\d+[.、)]\s*)/, "").trim(); }
+    var lines = String(value || "").split(/\n+/).map(keepTime).filter(Boolean);
+    if (lines.length === 1 && /[；;]/.test(lines[0])) lines = lines[0].split(/[；;]/).map(keepTime).filter(Boolean);
+    return lines;
+  }
+  function taskTime(value, fallback) {
+    var match = String(value || "").match(/(?:^|\s)(\d{1,2})\s*[：:]\s*(\d{2})(?:\s|$)/);
+    if (!match) return fallback;
+    var hour = Number(match[1]), minute = Number(match[2]);
+    if (hour > 23 || minute > 59) return fallback;
+    return String(hour).padStart(2, "0") + ":" + String(minute).padStart(2, "0");
+  }
+  function taskDuration(value) {
+    var match = String(value || "").match(/(?:至少|约|大约)?\s*(\d{1,3})\s*分钟/);
+    return match ? String(match[1]) : "";
+  }
+  function planTasks(plan) {
+    var groups = [
+      { key: "morning", time: "09:00", label: "早上" },
+      { key: "afternoon", time: "13:30", label: "下午" },
+      { key: "after15", time: "15:00", label: "15:00后" },
+      { key: "evening", time: "20:00", label: "晚上" }
+    ];
+    var tasks = [];
+    groups.forEach(function (group) {
+      taskLines(plan[group.key]).forEach(function (line) {
+        tasks.push({
+          id: Store.uid("TASK"), planId: plan.id, period: group.key, title: cleanTaskTitle(line),
+          date: plan.date, time: taskTime(line, group.time), category: group.key === "after15" ? "学习" : "计划任务",
+          duration: taskDuration(line), priority: "普通", note: "来自智能导入 · " + group.label,
+          completed: false, completedAt: "", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+        });
+      });
+    });
+    return tasks;
+  }
+  function importMetaFromDraft() {
+    var result = { source: "smart-import", parser: "local-rules-v1", confirmedAt: new Date().toISOString(), fields: {} };
+    if (smartImportDraft && smartImportDraft.meta) Object.keys(smartImportDraft.meta).forEach(function (key) { result.fields[key] = smartImportDraft.meta[key].status; });
+    return result;
+  }
+  function saveSmartImport(form) {
+    var type = form.dataset.type;
+    var data = getFormObject(form);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(data.date || "")) { showToast("请先确认记录日期"); var dateInput = form.elements.date; if (dateInput) dateInput.focus(); return; }
+    var now = new Date().toISOString();
+    if (type === "review") {
+      var review = Object.assign({}, data, { id: Store.uid("REV"), importMeta: importMetaFromDraft(), createdAt: now, updatedAt: now });
+      state.reviews.unshift(review);
+      if (save("复盘已确认保存")) { resetSmartImport(true); setPage("daily"); }
+      return;
+    }
+    if (type === "plan") {
+      var plan = Object.assign({}, data, { id: Store.uid("PLAN"), taskIds: [], importMeta: importMetaFromDraft(), createdAt: now, updatedAt: now });
+      var tasks = planTasks(plan);
+      plan.taskIds = tasks.map(function (task) { return task.id; });
+      state.plans.unshift(plan);
+      state.tasks = tasks.concat(state.tasks);
+      if (save("计划已确认保存，共生成 " + tasks.length + " 项任务")) { resetSmartImport(true); setPage("life-plan"); }
+    }
+  }
+
   function renderReviews() {
     var query = reviewSearch.trim().toLowerCase();
+    function resultCategory(value) {
+      var result = String(value || "");
+      if (/部分/.test(result)) return "部分做到";
+      if (/没做到|未完成|失败|未做到/.test(result)) return "没做到";
+      if (/做到|完成|成功/.test(result)) return "做到";
+      return result;
+    }
     var list = state.reviews.slice().sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); }).filter(function (item) {
-      var filterOk = reviewFilter === "全部" || String(item.executionResult || "").indexOf(reviewFilter) >= 0;
+      var filterOk = reviewFilter === "全部" || resultCategory(item.executionResult) === reviewFilter;
       var haystack = reviewFields.map(function (field) { return item[field.key] || ""; }).concat([item.date, item.rawText]).join(" ").toLowerCase();
       return filterOk && (!query || haystack.indexOf(query) >= 0);
     });
@@ -411,8 +590,18 @@
   }
   function renderTasks() {
     var list = state.tasks.filter(function (item) { return item.date === Store.today(); }).sort(function (a, b) { return timeOf(a.time).localeCompare(timeOf(b.time)); });
+    var plan = latestPlanForDate(Store.today());
+    if (plan) {
+      $("todayPlanSummary").innerHTML = '<article class="today-plan-summary"><span class="eyebrow gold">IMPORTED PLAN · ' + esc(formatDate(plan.date)) + '</span><h3>' + esc(plan.mostImportant || "今天最重要的一件事尚未填写") + '</h3><div class="plan-facts">' + (plan.latestStart ? '<span><strong>最晚开始</strong>' + esc(plan.latestStart) + '</span>' : '') + (plan.minAction ? '<span><strong>最低动作</strong>' + esc(plan.minAction) + '</span>' : '') + (plan.acceptance ? '<span><strong>验收标准</strong>' + esc(plan.acceptance) + '</span>' : '') + '</div></article>';
+    } else $("todayPlanSummary").innerHTML = "";
     if (!list.length) { $("taskList").innerHTML = emptyState("今天还没有计划", "添加一件真正需要完成的事。", "add-task", "新增今日任务"); return; }
-    $("taskList").innerHTML = list.map(function (item) { return '<div class="task-item ' + (item.completed ? "done" : "") + '"><input type="checkbox" data-action="toggle-task" data-id="' + esc(item.id) + '"' + (item.completed ? " checked" : "") + ' aria-label="标记完成"><time>' + esc(item.time || "--:--") + '</time><div class="task-copy"><strong>' + esc(item.title) + '</strong><span>' + esc((item.category || "普通任务") + " · " + (item.duration ? item.duration + "分钟" : "未设时长") + " · " + (item.priority || "普通")) + '</span></div><div class="inline-actions"><button type="button" data-action="edit-task" data-id="' + esc(item.id) + '" title="编辑">✎</button><button type="button" data-action="delay-task" data-id="' + esc(item.id) + '" title="延期到明天">→</button><button type="button" data-action="delete-task" data-id="' + esc(item.id) + '" title="删除">×</button></div></div>'; }).join("");
+    function taskHtml(item) { return '<div class="task-item ' + (item.completed ? "done" : "") + '"><input type="checkbox" data-action="toggle-task" data-id="' + esc(item.id) + '"' + (item.completed ? " checked" : "") + ' aria-label="标记完成"><time>' + esc(item.time || "--:--") + '</time><div class="task-copy"><strong>' + esc(item.title) + '</strong><span>' + esc((item.category || "普通任务") + " · " + (item.duration ? item.duration + "分钟" : "未设时长") + " · " + (item.priority || "普通")) + '</span></div><div class="inline-actions"><button type="button" data-action="edit-task" data-id="' + esc(item.id) + '" title="编辑">✎</button><button type="button" data-action="delay-task" data-id="' + esc(item.id) + '" title="延期到明天">→</button><button type="button" data-action="delete-task" data-id="' + esc(item.id) + '" title="删除">×</button></div></div>'; }
+    var periods = [{ key: "morning", label: "早上" }, { key: "afternoon", label: "下午" }, { key: "after15", label: "15:00之后 / 学习" }, { key: "evening", label: "晚上" }, { key: "other", label: "其他任务" }];
+    $("taskList").innerHTML = periods.map(function (period) {
+      var group = list.filter(function (item) { return period.key === "other" ? !item.period : item.period === period.key; });
+      if (!group.length) return "";
+      return '<section class="task-period"><header><strong>' + esc(period.label) + '</strong><span>' + group.filter(function (item) { return item.completed; }).length + '/' + group.length + '</span></header>' + group.map(taskHtml).join("") + '</section>';
+    }).join("");
   }
   function renderGoals() {
     var list = state.goals.slice().sort(function (a, b) { return String(b.updatedAt || b.startDate).localeCompare(String(a.updatedAt || a.startDate)); });
@@ -757,8 +946,12 @@
     else if (action === "calendar-prev" || action === "calendar-next") { calendarCursor.setMonth(calendarCursor.getMonth() + (action === "calendar-next" ? 1 : -1)); renderCalendar(); }
     else if (action === "select-calendar-day") { selectedCalendarDate = element.dataset.date; var d = toDate(selectedCalendarDate); calendarCursor = new Date(d.getFullYear(), d.getMonth(), 1); renderCalendar(); }
     else if (action === "focus-review-input") { setPage("daily"); setTimeout(function () { $("reviewRawInput").focus(); $("reviewRawInput").scrollIntoView({ behavior: "smooth", block: "center" }); }, 60); }
-    else if (action === "identify-review") { var raw = $("reviewRawInput").value.trim(); if (!raw) { showToast("请先粘贴完整复盘"); return; } var parsed = parseReview(raw); showReviewPreview(parsed.data); $("reviewParseStatus").textContent = "已识别 " + parsed.count + " 项，请检查预览后保存。"; if (parsed.count < 2) showToast("识别字段较少，请在预览中补充"); }
+    else if (action === "identify-review") { var raw = $("reviewRawInput").value.trim(); if (!raw) { showToast("请先粘贴完整复盘"); return; } var parsed = addPlanReferenceToReview(ImportParser.parse(raw, "review")); showReviewPreview(parsed.data); $("reviewParseStatus").textContent = "已识别 " + parsed.count + " 项，请检查预览后保存。"; if (parsed.count < 2) showToast("识别字段较少，请在预览中补充"); }
     else if (action === "cancel-review-preview") { $("reviewStructuredForm").classList.add("hidden"); $("reviewStructuredForm").innerHTML = ""; $("reviewParseStatus").textContent = "已取消预览，原文仍保留。"; }
+    else if (action === "identify-smart-import") identifySmartImport();
+    else if (action === "force-import-type") identifySmartImport(element.dataset.type);
+    else if (action === "back-smart-import") resetSmartImport(false);
+    else if (action === "cancel-smart-import") resetSmartImport(true);
     else if (action === "toggle-review") { var card = element.closest(".archive-card"); if (card) card.classList.toggle("open"); }
     else if (action === "open-review") openReviewDetail(id);
     else if (action === "edit-review") openReviewEdit(id);
@@ -790,7 +983,7 @@
     else if (action === "open-record") openGenericRecord(element.dataset.key, id);
     else if (action === "export-all") { var payload = Store.exportPayload(state); download("筑台者-V2-备份-" + Store.today() + ".json", JSON.stringify(payload, null, 2)); showToast("备份已导出"); }
     else if (action === "import-all") $("importFile").click();
-    else if (action === "clear-all") { if (!window.confirm("第一次确认：确定清空筑台者 V2 的全部数据吗？旧版 V1 数据不会被删除。")) return; if (!window.confirm("第二次确认：该操作无法撤销，是否继续？")) return; state = Store.clearV2(); selectedProductId = ""; renderAll(); showToast("V2 数据已清空"); }
+    else if (action === "clear-all") { if (!window.confirm("第一次确认：确定清空筑台者 V2 的全部数据吗？旧版 V1 数据不会被删除。")) return; if (!window.confirm("第二次确认：系统会先自动备份当前 V2 数据，是否继续？")) return; try { state = Store.clearV2(); selectedProductId = ""; renderAll(); showToast("V2 数据已备份并清空"); } catch (error) { showToast("清空失败，原数据保持不变：" + error.message); } }
   }
 
   function bindEvents() {
@@ -812,6 +1005,7 @@
     $("reviewFilters").addEventListener("click", function (event) { var chip = event.target.closest("[data-review-filter]"); if (!chip) return; reviewFilter = chip.dataset.reviewFilter; document.querySelectorAll("[data-review-filter]").forEach(function (item) { item.classList.toggle("active", item === chip); }); renderReviews(); });
     $("modalForm").addEventListener("submit", function (event) { event.preventDefault(); if (!modalSubmitHandler) return; modalSubmitHandler(getFormObject(event.currentTarget), event.currentTarget); });
     $("reviewStructuredForm").addEventListener("submit", function (event) { event.preventDefault(); saveReviewForm(event.currentTarget, event.currentTarget.dataset.id || ""); });
+    $("smartImportPreviewForm").addEventListener("submit", function (event) { event.preventDefault(); saveSmartImport(event.currentTarget); });
     $("profileForm").addEventListener("submit", function (event) { event.preventDefault(); state.settings = Object.assign({}, state.settings, getFormObject(event.currentTarget)); state.settings.targetAge = number(state.settings.targetAge) || 80; save("个人设置已保存"); });
     $("importFile").addEventListener("change", function (event) { var file = event.target.files && event.target.files[0]; if (!file) return; var reader = new FileReader(); reader.onload = function () { try { var parsed = JSON.parse(reader.result); if (!window.confirm("导入会覆盖当前 V2 数据，系统会先保存一份本地备份。是否继续？")) return; state = Store.importPayload(parsed); selectedProductId = state.products[0] ? state.products[0].id : ""; renderAll(); showToast("数据恢复成功"); } catch (error) { showToast("导入失败：" + error.message); } finally { event.target.value = ""; } }; reader.readAsText(file, "utf-8"); });
     $("modalLayer").addEventListener("click", function (event) { if (event.target === $("modalLayer")) closeModal(); });
@@ -822,6 +1016,8 @@
   function init() {
     renderAll();
     bindEvents();
+    var notice = Store.getNotice ? Store.getNotice() : "";
+    if (notice) { setTimeout(function () { showToast(notice); if (Store.clearNotice) Store.clearNotice(); }, 120); }
     clearInterval(clockTimer); clockTimer = setInterval(updateClock, 30000);
     if ("serviceWorker" in navigator && location.protocol.indexOf("http") === 0) navigator.serviceWorker.register("./sw.js").catch(function () {});
   }

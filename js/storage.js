@@ -3,9 +3,12 @@
 
   var STATE_KEY = "zhutai-v2-state-v1";
   var MIGRATION_KEY = "zhutai-v2-migration-complete-v1";
+  var SCHEMA_VERSION = 3;
+  var SCHEMA_MIGRATION_KEY = "zhutai-v2-schema-v3-complete-v1";
   var LEGACY_REVIEW_KEY = "zhutai-correction-reviews-v1";
   var LEGACY_INSIGHT_KEY = "zc-observation-records-v2";
   var LEGACY_KEYS = ["dingzhenchao-insight-offline-v1", "huangsiquan-insight-offline-v1", "x" + "unji-insight-offline-v1"];
+  var storageNotice = "";
 
   function today() {
     var d = new Date();
@@ -19,6 +22,7 @@
   function defaultState() {
     return {
       version: 2,
+      schemaVersion: SCHEMA_VERSION,
       createdAt: new Date().toISOString(),
       settings: {
         name: "丁振超",
@@ -45,6 +49,7 @@
       quotes: ["不是看到了希望才坚持，而是坚持了才会看到希望。"],
       quoteIndex: 0,
       reviews: [],
+      plans: [],
       insights: [],
       tasks: [],
       goals: [],
@@ -75,17 +80,21 @@
     var base = defaultState();
     var source = input && typeof input === "object" ? input : {};
     base.version = 2;
+    base.schemaVersion = SCHEMA_VERSION;
     base.createdAt = source.createdAt || base.createdAt;
     base.settings = Object.assign(base.settings, source.settings || {});
     if (!String(base.settings.name || "").trim()) base.settings.name = "丁振超";
     base.correction = Object.assign(base.correction, source.correction || {});
     base.mainline = Object.assign(base.mainline, source.mainline || {});
-    ["reviews", "insights", "tasks", "goals", "focusItems", "products", "iterations", "learnings", "meditations", "resources"].forEach(function (key) {
+    ["reviews", "plans", "insights", "tasks", "goals", "focusItems", "products", "iterations", "learnings", "meditations", "resources"].forEach(function (key) {
       base[key] = asArray(source[key]);
     });
     base.quotes = asArray(source.quotes).filter(function (item) { return String(item || "").trim(); });
     if (!base.quotes.length) base.quotes = defaultState().quotes;
     base.quoteIndex = Math.max(0, Math.min(Number(source.quoteIndex) || 0, base.quotes.length - 1));
+    Object.keys(source).forEach(function (key) {
+      if (!Object.prototype.hasOwnProperty.call(base, key)) base[key] = source[key];
+    });
     return base;
   }
 
@@ -185,23 +194,61 @@
     return state;
   }
 
+  function backupRaw(prefix, raw) {
+    if (!raw) return "";
+    var key = prefix + Date.now();
+    localStorage.setItem(key, raw);
+    if (localStorage.getItem(key) !== raw) throw new Error("本地备份校验失败");
+    return key;
+  }
+
+  function migrateSchemaIfNeeded(raw, saved) {
+    var sourceVersion = Number(saved && saved.schemaVersion) || 2;
+    if (sourceVersion >= SCHEMA_VERSION) {
+      try { localStorage.setItem(SCHEMA_MIGRATION_KEY, "1"); } catch (error) {}
+      return normalizeState(saved);
+    }
+    try {
+      backupRaw("zhutai-v2-before-schema-v3-", raw);
+      var migrated = normalizeState(saved);
+      localStorage.setItem(STATE_KEY, JSON.stringify(migrated));
+      localStorage.setItem(SCHEMA_MIGRATION_KEY, "1");
+      storageNotice = "数据结构已安全升级，并已自动保留升级前备份。";
+      return migrated;
+    } catch (error) {
+      storageNotice = "数据升级未写入：" + error.message + "。原数据仍保持不变。";
+      return normalizeState(saved);
+    }
+  }
+
   function load() {
-    var saved = safeParse(localStorage.getItem(STATE_KEY), null);
-    if (saved) return normalizeState(saved);
+    var raw = localStorage.getItem(STATE_KEY);
+    var saved = safeParse(raw, null);
+    if (saved) return migrateSchemaIfNeeded(raw, saved);
     var state = localStorage.getItem(MIGRATION_KEY) ? defaultState() : migrateLegacy();
     save(state);
     return state;
   }
 
   function save(state) {
+    var currentRaw = localStorage.getItem(STATE_KEY);
+    var current = safeParse(currentRaw, null);
+    if (currentRaw && current && (Number(current.schemaVersion) || 2) < SCHEMA_VERSION && !localStorage.getItem(SCHEMA_MIGRATION_KEY)) {
+      backupRaw("zhutai-v2-before-schema-v3-", currentRaw);
+    }
     var normalized = normalizeState(state);
     localStorage.setItem(STATE_KEY, JSON.stringify(normalized));
+    localStorage.setItem(MIGRATION_KEY, "1");
+    localStorage.setItem(SCHEMA_MIGRATION_KEY, "1");
     return normalized;
   }
 
   function clearV2() {
+    var currentRaw = localStorage.getItem(STATE_KEY);
+    if (currentRaw) backupRaw("zhutai-v2-before-clear-", currentRaw);
     var state = defaultState();
     localStorage.setItem(MIGRATION_KEY, "1");
+    localStorage.setItem(SCHEMA_MIGRATION_KEY, "1");
     localStorage.setItem(STATE_KEY, JSON.stringify(state));
     return state;
   }
@@ -210,7 +257,8 @@
     if (!payload || typeof payload !== "object") throw new Error("备份文件格式不正确");
     var source = payload.state || payload;
     if (!source || typeof source !== "object") throw new Error("备份文件缺少数据");
-    try { localStorage.setItem("zhutai-v2-before-import-" + Date.now(), localStorage.getItem(STATE_KEY) || ""); } catch (error) {}
+    var currentRaw = localStorage.getItem(STATE_KEY);
+    if (currentRaw) backupRaw("zhutai-v2-before-import-", currentRaw);
     localStorage.setItem(MIGRATION_KEY, "1");
     return save(source);
   }
@@ -218,15 +266,21 @@
   function exportPayload(state) {
     return {
       app: "筑台者 V2",
-      version: 2,
+      version: 3,
+      schemaVersion: SCHEMA_VERSION,
       exportedAt: new Date().toISOString(),
       state: normalizeState(state)
     };
   }
 
+  function getNotice() { return storageNotice; }
+  function clearNotice() { storageNotice = ""; }
+
   window.ZTStore = {
     STATE_KEY: STATE_KEY,
     MIGRATION_KEY: MIGRATION_KEY,
+    SCHEMA_VERSION: SCHEMA_VERSION,
+    SCHEMA_MIGRATION_KEY: SCHEMA_MIGRATION_KEY,
     LEGACY_REVIEW_KEY: LEGACY_REVIEW_KEY,
     LEGACY_INSIGHT_KEY: LEGACY_INSIGHT_KEY,
     today: today,
@@ -237,6 +291,8 @@
     save: save,
     clearV2: clearV2,
     importPayload: importPayload,
-    exportPayload: exportPayload
+    exportPayload: exportPayload,
+    getNotice: getNotice,
+    clearNotice: clearNotice
   };
 })(window);

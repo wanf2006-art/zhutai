@@ -1,5 +1,5 @@
-const CACHE_NAME = "zhutai-v2-shell-v2";
-const APP_SHELL = ["./", "./index.html", "./styles.css", "./icon.svg", "./icon-sprout-180.png", "./icon-sprout-192.png", "./icon-sprout-512.png", "./manifest.webmanifest", "./js/icons.js", "./js/storage.js", "./js/app.js"];
+const CACHE_NAME = "zhutai-v2-shell-v4";
+const APP_SHELL = ["./", "./index.html", "./styles.css", "./icon.svg", "./icon-sprout-180.png", "./icon-sprout-192.png", "./icon-sprout-512.png", "./manifest.webmanifest", "./js/icons.js", "./js/storage.js", "./js/import-parser.js", "./js/app.js"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()));

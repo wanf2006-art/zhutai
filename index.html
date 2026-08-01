@@ -63,6 +63,7 @@
             <span class="status-pill" id="correctionStatus">待设置</span>
           </div>
           <div class="correction-actions">
+            <button class="btn primary" type="button" data-nav="smart-import">智能导入</button>
             <button class="btn subtle" type="button" data-action="edit-correction">编辑整改</button>
             <button class="btn gold-outline" type="button" data-action="complete-correction">完成本轮</button>
           </div>
@@ -78,6 +79,7 @@
         <div class="dashboard-grid hero-grid">
           <article class="card-surface trajectory-card span-2">
             <header class="card-head"><div><span class="eyebrow">TODAY TRACE</span><h2>今日轨迹</h2></div><button class="btn subtle" type="button" data-nav="life-plan" data-icon-button="edit">编辑计划</button></header>
+            <div id="overviewPlanSummary"></div>
             <div class="timeline" id="todayTimeline"></div>
           </article>
           <article class="card-surface calendar-card">
@@ -101,6 +103,24 @@
         </div>
       </section>
 
+      <section class="view" id="view-smart-import" data-view="smart-import" aria-labelledby="smartImportHeading">
+        <div class="page-head"><div><span class="eyebrow">LOCAL SMART IMPORT</span><h1 id="smartImportHeading">导入明灯记录</h1><p>粘贴完整文本，本地识别复盘或计划；检查确认后才会保存。</p></div></div>
+        <article class="smart-import-card card-surface">
+          <div class="import-step" id="smartImportPasteStep">
+            <div class="import-intro"><span class="import-mark" data-icon-slot="build"></span><div><span class="eyebrow gold">SMART IMPORT · 纯离线</span><h2>一次粘贴，快速确认</h2><p>支持 Markdown、【字段】、项目符号、空行与常见近义标题。原文会始终保留。</p></div></div>
+            <label class="field-label" for="smartImportRaw">复盘或次日计划原文</label>
+            <textarea class="large-input smart-import-input" id="smartImportRaw" placeholder="把明灯整理好的完整复盘或次日计划粘贴到这里……"></textarea>
+            <div class="import-status-row"><span class="helper" id="smartImportStatus">尚未识别，正式数据不会发生变化。</span><button class="btn primary" type="button" data-action="identify-smart-import">识别并预览</button></div>
+            <div class="manual-type hidden" id="smartImportManualType" role="group" aria-label="手动选择导入类型"><strong>无法可靠判断文本类型，请选择后继续：</strong><div class="button-group"><button class="btn subtle" type="button" data-action="force-import-type" data-type="review">这是每日复盘</button><button class="btn subtle" type="button" data-action="force-import-type" data-type="plan">这是次日计划</button></div></div>
+          </div>
+          <form class="smart-preview hidden" id="smartImportPreviewForm">
+            <div class="preview-head"><div><span class="eyebrow gold">PREVIEW · 保存前确认</span><h2 id="smartPreviewTitle">识别预览</h2><p id="smartPreviewSummary"></p></div><span class="type-badge" id="smartPreviewType"></span></div>
+            <div class="import-field-grid" id="smartImportFields"></div>
+            <div class="preview-actions"><button class="btn subtle" type="button" data-action="back-smart-import">返回修改原文</button><button class="btn subtle" type="button" data-action="cancel-smart-import">取消导入</button><button class="btn primary" type="submit">确认保存</button></div>
+          </form>
+        </article>
+      </section>
+
       <section class="view" id="view-daily" data-view="daily" aria-labelledby="dailyHeading">
         <div class="page-head"><div><span class="eyebrow">DAILY ARCHIVE</span><h1 id="dailyHeading">每日记录</h1><p>把行动、证据和整改留在同一条时间线上。</p></div><button class="btn primary" type="button" data-action="focus-review-input">＋ 新建复盘</button></div>
         <article class="review-composer card-surface">
@@ -118,7 +138,7 @@
         <div class="page-head"><div><span class="eyebrow">LIFE PLAN</span><h1 id="planHeading">人生计划</h1><p>先守住唯一长期主线，再安排今天这一层。</p></div><button class="btn primary" type="button" data-action="add-task">＋ 新增今日任务</button></div>
         <article class="mainline-card card-surface" id="mainlineCard"></article>
         <div class="split-layout">
-          <article class="card-surface"><header class="card-head"><div><span class="eyebrow">TODAY PLAN</span><h2>今日计划</h2></div><button class="text-btn" type="button" data-action="add-task">＋ 新增</button></header><div id="taskList" class="task-list"></div></article>
+          <article class="card-surface"><header class="card-head"><div><span class="eyebrow">TODAY PLAN</span><h2>今日计划</h2></div><button class="text-btn" type="button" data-action="add-task">＋ 新增</button></header><div id="todayPlanSummary"></div><div id="taskList" class="task-list"></div></article>
           <article class="card-surface"><header class="card-head"><div><span class="eyebrow">LONG-TERM GOALS</span><h2>长期计划</h2></div><button class="text-btn" type="button" data-action="add-goal">＋ 新增</button></header><div id="goalList" class="goal-list"></div></article>
         </div>
       </section>
@@ -181,6 +201,7 @@
 
   <script src="./js/icons.js" defer></script>
   <script src="./js/storage.js" defer></script>
+  <script src="./js/import-parser.js" defer></script>
   <script src="./js/app.js" defer></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-const CACHE_NAME = "zhutai-v2-shell-v4";
+const CACHE_NAME = "zhutai-v2-shell-v5";
 const APP_SHELL = ["./", "./index.html", "./styles.css", "./icon.svg", "./icon-sprout-180.png", "./icon-sprout-192.png", "./icon-sprout-512.png", "./manifest.webmanifest", "./js/icons.js", "./js/storage.js", "./js/import-parser.js", "./js/app.js"];
 
 self.addEventListener("install", (event) => {

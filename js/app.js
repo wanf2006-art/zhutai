@@ -553,12 +553,22 @@
       return;
     }
     if (type === "plan") {
+      var sameDatePlans = state.plans.filter(function (item) { return item.date === data.date; });
+      if (sameDatePlans.length && !window.confirm(formatDate(data.date) + "已经保存过计划。\n\n确定：覆盖当天计划\n取消：保留原计划")) {
+        showToast("已取消覆盖，当天原计划保持不变");
+        return;
+      }
       var plan = Object.assign({}, data, { id: Store.uid("PLAN"), taskIds: [], importMeta: importMetaFromDraft(), createdAt: now, updatedAt: now });
       var tasks = planTasks(plan);
       plan.taskIds = tasks.map(function (task) { return task.id; });
+      if (sameDatePlans.length) {
+        var replacedPlanIds = sameDatePlans.map(function (item) { return item.id; });
+        state.plans = state.plans.filter(function (item) { return item.date !== data.date; });
+        state.tasks = state.tasks.filter(function (task) { return replacedPlanIds.indexOf(task.planId) < 0 || task.date !== data.date; });
+      }
       state.plans.unshift(plan);
       state.tasks = tasks.concat(state.tasks);
-      if (save("计划已确认保存，共生成 " + tasks.length + " 项任务")) { resetSmartImport(true); setPage("life-plan"); }
+      if (save(sameDatePlans.length ? "当天计划已覆盖，共生成 " + tasks.length + " 项任务" : "计划已确认保存，共生成 " + tasks.length + " 项任务")) { resetSmartImport(true); setPage("life-plan"); }
     }
   }
 
@@ -601,6 +611,31 @@
       var group = list.filter(function (item) { return period.key === "other" ? !item.period : item.period === period.key; });
       if (!group.length) return "";
       return '<section class="task-period"><header><strong>' + esc(period.label) + '</strong><span>' + group.filter(function (item) { return item.completed; }).length + '/' + group.length + '</span></header>' + group.map(taskHtml).join("") + '</section>';
+    }).join("");
+  }
+  function renderPlanHistory() {
+    var newestByDate = {};
+    state.plans.forEach(function (item) {
+      var current = newestByDate[item.date];
+      var itemTime = String(item.updatedAt || item.createdAt || "");
+      var currentTime = current ? String(current.updatedAt || current.createdAt || "") : "";
+      if (!current || itemTime > currentTime) newestByDate[item.date] = item;
+    });
+    var list = Object.keys(newestByDate).map(function (date) { return newestByDate[date]; }).sort(function (a, b) {
+      var byDate = String(b.date || "").localeCompare(String(a.date || ""));
+      return byDate || String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || ""));
+    });
+    $("planHistoryCount").textContent = list.length ? list.length + " 个日期" : "";
+    if (!list.length) {
+      $("planHistoryList").innerHTML = emptyState("还没有历史计划", "通过智能导入保存计划后，会按日期保留在这里。");
+      return;
+    }
+    $("planHistoryList").innerHTML = list.map(function (item) {
+      var tasks = state.tasks.filter(function (task) { return task.planId === item.id; });
+      var completed = tasks.filter(function (task) { return task.completed; }).length;
+      var result = tasks.length ? completed + "/" + tasks.length + " 已完成" : "计划已保存";
+      var resultClass = tasks.length && completed === tasks.length ? "success" : completed ? "partial" : "";
+      return '<article class="archive-card plan-history-item"><button class="archive-summary" type="button" data-action="open-plan" data-id="' + esc(item.id) + '"><time>' + esc(item.date) + '</time><div><h3>' + esc(item.mostImportant || "当天计划") + '</h3><p>' + esc(item.minAction || item.acceptance || "点击查看完整计划") + '</p></div><span class="result-badge ' + resultClass + '">' + esc(result) + '</span><span class="archive-arrow">→</span></button></article>';
     }).join("");
   }
   function renderGoals() {
@@ -706,7 +741,7 @@
   function renderPage(page) {
     if (page === "overview") renderOverview();
     else if (page === "daily") renderReviews();
-    else if (page === "life-plan") { renderMainline(); renderTasks(); renderGoals(); }
+    else if (page === "life-plan") { renderMainline(); renderTasks(); renderGoals(); renderPlanHistory(); }
     else if (page === "insights") renderInsights();
     else if (page === "products") renderProducts();
     else if (page === "learning") renderLearning();
@@ -715,7 +750,7 @@
     else if (page === "dashboard") renderDashboard();
     else if (page === "settings") renderSettings();
   }
-  function renderAll() { document.body.classList.toggle("theme-midnight", state.settings.theme === "midnight"); renderNav(); renderOverview(); renderReviews(); renderMainline(); renderTasks(); renderGoals(); renderInsights(); renderProducts(); renderLearning(); renderMeditation(); renderResources(); renderDashboard(); renderSettings(); }
+  function renderAll() { document.body.classList.toggle("theme-midnight", state.settings.theme === "midnight"); renderNav(); renderOverview(); renderReviews(); renderMainline(); renderTasks(); renderGoals(); renderPlanHistory(); renderInsights(); renderProducts(); renderLearning(); renderMeditation(); renderResources(); renderDashboard(); renderSettings(); }
 
   function modalButtons(label, dangerId) {
     return '<div class="form-actions">' + (dangerId ? '<button class="btn danger" type="button" data-action="' + esc(dangerId) + '">删除</button>' : '') + '<button class="btn subtle" type="button" data-action="close-modal">取消</button><button class="btn primary" type="submit">' + esc(label || "保存") + '</button></div>';
@@ -833,6 +868,23 @@
     var sections = reviewFields.map(function (field) { return { label: field.label, value: item[field.key] }; });
     sections.push({ label: "完整复盘原文", value: item.rawText });
     openDrawer(item.mostImportant || item.note || "复盘记录", "DAILY REVIEW · " + item.date, detailHtml(item.mostImportant || "一条复盘", formatDate(item.date) + " · " + (item.executionResult || "未标记执行结果"), sections, '<button class="btn subtle" type="button" data-action="edit-review" data-id="' + esc(item.id) + '">编辑</button><button class="btn danger" type="button" data-action="delete-review" data-id="' + esc(item.id) + '">删除</button>'));
+  }
+  function openPlanDetail(id) {
+    var item = findById(state.plans, id); if (!item) return;
+    var planTaskList = state.tasks.filter(function (task) { return task.planId === item.id; });
+    var completed = planTaskList.filter(function (task) { return task.completed; }).length;
+    var sections = [
+      { label: "早上任务", value: item.morning },
+      { label: "下午任务", value: item.afternoon },
+      { label: "15:00之后的任务 / 学习任务", value: item.after15 },
+      { label: "晚上任务", value: item.evening },
+      { label: "明天最重要的一件事", value: item.mostImportant },
+      { label: "最晚开始时间", value: item.latestStart },
+      { label: "最低动作", value: item.minAction },
+      { label: "验收标准", value: item.acceptance },
+      { label: "完整计划原文", value: item.rawText }
+    ];
+    openDrawer(formatDate(item.date) + "计划", "PLAN ARCHIVE · " + item.date, detailHtml(item.mostImportant || "当天计划", formatDate(item.date) + " · " + completed + "/" + planTaskList.length + " 项任务已完成", sections, ""));
   }
   function openReviewEdit(id) {
     var item = findById(state.reviews, id); if (!item) return;
@@ -954,6 +1006,7 @@
     else if (action === "cancel-smart-import") resetSmartImport(true);
     else if (action === "toggle-review") { var card = element.closest(".archive-card"); if (card) card.classList.toggle("open"); }
     else if (action === "open-review") openReviewDetail(id);
+    else if (action === "open-plan") openPlanDetail(id);
     else if (action === "edit-review") openReviewEdit(id);
     else if (action === "delete-review") deleteRecord("reviews", id, "复盘");
     else if (action === "add-insight") openInsightForm();
